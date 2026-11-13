@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Print Cost Calculator</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1c2230; --muted:#657089; --line:#dfe3ea; --accent:#2457d6; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height:1.4; }
+  .wrap { max-width:640px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:10px; }
+  input { width:100%; margin-top:4px; padding:9px 10px; font-size:16px; border:1px solid var(--line); border-radius:6px; color:var(--ink); background:#fff; }
+  input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+  .note { font-size:12px; color:var(--muted); margin:-4px 0 10px; }
+  .line { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line); }
+  .line:last-of-type { border-bottom:0; }
+  .line.total { font-weight:600; }
+  .price { background:var(--ink); color:#fff; border-radius:8px; padding:16px; margin-top:12px; }
+  .price small { display:block; opacity:.75; font-size:13px; }
+  .price strong { font-size:34px; }
+  .actions { margin-top:12px; display:flex; gap:8px; }
+  button { padding:9px 14px; font-size:14px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  .tablewrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
+  th, td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:right; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
+  tfoot td { font-weight:600; border-bottom:0; }
+  td button { padding:2px 8px; font-size:12px; }
+  .empty { color:var(--muted); font-size:13px; margin:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>3D Print Cost Calculator</h1>
+  <p class="sub">Enter your model details. Results update as you type.</p>
+
+  <section>
+    <h2>1. Model details</h2>
+    <label>Model name
+      <input id="name" type="text" placeholder="e.g. Helmet visor clip">
+    </label>
+    <label>Quantity (number of pieces printed together)
+      <input id="qty" type="number" min="1" step="1" value="1">
+    </label>
+  </section>
+
+  <section>
+    <h2>2. Filament details</h2>
+    <div class="row">
+      <label>Filament roll price (₹ per 1 kg)
+        <input id="fprice" type="number" min="0" step="any" value="1000">
+      </label>
+      <label>Filament used (grams)
+        <input id="fgrams" type="number" min="0" step="any" value="101.83">
+      </label>
+    </div>
+    <p class="note">Take the grams from your slicer (total for all pieces).</p>
+  </section>
+
+  <section>
+    <h2>3. Printing time</h2>
+    <div class="row">
+      <label>Hours <input id="hrs" type="number" min="0" step="any" value="1"></label>
+      <label>Minutes <input id="mins" type="number" min="0" step="any" value="0"></label>
+    </div>
+    <p class="note" id="elenote"></p>
+    <label>Machine depreciation / maintenance (₹ per printing hour)
+      <input id="mrate" type="number" min="0" step="any" value="45">
+    </label>
+  </section>
+
+  <section>
+    <h2>4. Additional expenses</h2>
+    <p class="note">Enter 0 if not applicable.</p>
+    <div class="row">
+      <label>Labour (₹) <input id="labour" type="number" min="0" step="any" value="0"></label>
+      <label>Painting (₹) <input id="paint" type="number" min="0" step="any" value="0"></label>
+      <label>Packaging (₹) <input id="pack" type="number" min="0" step="any" value="0"></label>
+      <label>Other expenses (₹) <input id="other" type="number" min="0" step="any" value="0"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. Profit margin</h2>
+    <label>Desired profit margin (% on top of production cost)
+      <input id="margin" type="number" min="0" step="any" value="40">
+    </label>
+  </section>
+
+  <section>
+    <h2>Your calculation</h2>
+    <div class="line"><span>Filament</span><span id="r-fil">₹0.00</span></div>
+    <div class="line"><span id="r-ele-l">Electricity</span><span id="r-ele">₹0.00</span></div>
+    <div class="line"><span>Machine cost</span><span id="r-mac">₹0.00</span></div>
+    <div class="line"><span>Additional expenses</span><span id="r-add">₹0.00</span></div>
+    <div class="line total"><span>Total production cost</span><span id="r-tot">₹0.00</span></div>
+    <div class="line"><span>Expected profit</span><span id="r-pro">₹0.00</span></div>
+    <div class="price">
+      <small>Suggested selling price</small>
+      <strong id="r-sell">₹0.00</strong>
+      <small id="r-each"></small>
+    </div>
+    <div class="actions">
+      <button id="saveNext" type="button">Save &amp; start next</button>
+      <button id="save" type="button">Save to log</button>
+      <button id="newCalc" type="button">New calculation</button>
+      <button id="copy" type="button">Copy summary</button>
+      <button id="reset" type="button">Reset saved values</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Saved log (your accounts sheet)</h2>
+    <p class="note">Click "Save to log" above to add the current calculation as a row. Then download it as an Excel file.</p>
+    <div class="tablewrap" id="logwrap"></div>
+    <div class="actions">
+      <button id="xl" type="button">Download Excel file</button>
+      <button id="impBtn" type="button">Import earlier Excel/CSV</button>
+      <input id="imp" type="file" accept=".csv,text/csv" hidden>
+      <button id="clearlog" type="button">Clear log</button>
+    </div>
+  </section>
+</div>
+
+<script>
+  /* ====== FIXED VALUES: change these two numbers if needed ====== */
+  const PRINTER_WATTS   = 100;  // Bambu Lab A1 average while printing (~95 W on PLA, a little extra for PETG/heating)
+  const RATE_PER_UNIT   = 9;    // Rs per unit (1 unit = 1 kWh). Karnataka bill: total electricity bill / units used
+  /* ============================================================== */
+  const PRINTER_KW = PRINTER_WATTS / 1000;
+
+  const ids = ["name","qty","fprice","fgrams","hrs","mins","mrate","labour","paint","pack","other","margin"];
+  const $ = id => document.getElementById(id);
+  const num = id => Math.max(0, parseFloat($(id).value) || 0);
+  const money = n => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let summary = "";
+  let last = null;
+
+  function calc() {
+    const hours = num("hrs") + num("mins") / 60;
+    const filament = num("fgrams") / 1000 * num("fprice");
+    const units = PRINTER_KW * hours;
+    const electricity = units * RATE_PER_UNIT;
+    const machine = hours * num("mrate");
+    const extras = num("labour") + num("paint") + num("pack") + num("other");
+    const total = filament + electricity + machine + extras;
+    const profit = total * num("margin") / 100;
+    const sell = total + profit;
+    const qty = Math.max(1, Math.round(num("qty")) || 1);
+    last = { name: $("name").value.trim() || "Untitled", qty, filament, electricity, machine, extras, total, profit, sell };
+
+    $("r-fil").textContent = money(filament);
+    $("r-ele").textContent = money(electricity);
+    $("r-ele-l").textContent = "Electricity (" + units.toFixed(2) + " units)";
+    $("r-mac").textContent = money(machine);
+    $("r-add").textContent = money(extras);
+    $("r-tot").textContent = money(total);
+    $("r-pro").textContent = money(profit);
+    $("r-sell").textContent = money(sell);
+    $("r-each").textContent = qty > 1 ? money(sell / qty) + " per piece for " + qty + " pieces" : "";
+
+    summary = (($("name").value || "3D print") + "\n") +
+      "Filament: " + money(filament) + "\nElectricity: " + money(electricity) +
+      "\nMachine: " + money(machine) + "\nAdditional: " + money(extras) +
+      "\nProduction cost: " + money(total) + "\nProfit (" + num("margin") + "%): " + money(profit) +
+      "\nSelling price: " + money(sell) + (qty > 1 ? " (" + money(sell / qty) + " each)" : "");
+
+    try { localStorage.setItem("printcalc", JSON.stringify(Object.fromEntries(ids.map(i => [i, $(i).value])))); } catch (e) {}
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("printcalc") || "null");
+    if (saved) ids.forEach(i => { if (saved[i] !== undefined) $(i).value = saved[i]; });
+  } catch (e) {}
+
+  ids.forEach(i => $(i).addEventListener("input", calc));
+
+  $("copy").addEventListener("click", () => {
+    const done = () => { $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy summary", 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(summary).then(done, () => alert(summary));
+    else alert(summary);
+  });
+
+  $("reset").addEventListener("click", () => {
+    try { localStorage.removeItem("printcalc"); } catch (e) {}
+    location.reload();
+  });
+
+  /* ---------- Accounting log ---------- */
+  let log = [];
+  try { log = JSON.parse(localStorage.getItem("printlog") || "[]"); } catch (e) {}
+  const r2 = n => Math.round(n * 100) / 100;
+  const saveLog = () => { try { localStorage.setItem("printlog", JSON.stringify(log)); } catch (e) {} };
+
+  function renderLog() {
+    const wrap = $("logwrap");
+    if (!log.length) { wrap.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+    const sum = k => log.reduce((a, e) => a + e[k], 0);
+    wrap.innerHTML = "<table><thead><tr><th>Date</th><th>Model</th><th>Qty</th><th>Filament</th><th>Electricity</th><th>Machine</th><th>Additional</th><th>Cost</th><th>Profit</th><th>Selling price</th><th></th></tr></thead><tbody>" +
+      log.map((e, i) => "<tr><td>" + e.date + "</td><td>" + e.name.replace(/</g, "&lt;") + "</td><td>" + e.qty + "</td><td>" + e.filament.toFixed(2) + "</td><td>" + e.electricity.toFixed(2) + "</td><td>" + e.machine.toFixed(2) + "</td><td>" + e.extras.toFixed(2) + "</td><td>" + e.total.toFixed(2) + "</td><td>" + e.profit.toFixed(2) + "</td><td>" + e.sell.toFixed(2) + '</td><td><button data-i="' + i + '">Delete</button></td></tr>').join("") +
+      "</tbody><tfoot><tr><td></td><td>Total</td><td></td><td>" + sum("filament").toFixed(2) + "</td><td>" + sum("electricity").toFixed(2) + "</td><td>" + sum("machine").toFixed(2) + "</td><td>" + sum("extras").toFixed(2) + "</td><td>" + sum("total").toFixed(2) + "</td><td>" + sum("profit").toFixed(2) + "</td><td>" + sum("sell").toFixed(2) + "</td><td></td></tr></tfoot></table>";
+  }
+
+  $("save").addEventListener("click", () => {
+    const d = new Date();
+    const date = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    log.push({ date, name: last.name, qty: last.qty, filament: r2(last.filament), electricity: r2(last.electricity), machine: r2(last.machine), extras: r2(last.extras), total: r2(last.total), profit: r2(last.profit), sell: r2(last.sell) });
+    saveLog(); renderLog();
+    $("save").textContent = "Saved"; setTimeout(() => $("save").textContent = "Save to log", 1200);
+  });
+
+  $("logwrap").addEventListener("click", e => {
+    const i = e.target.getAttribute("data-i");
+    if (i !== null) { log.splice(+i, 1); saveLog(); renderLog(); }
+  });
+
+  $("clearlog").addEventListener("click", () => {
+    if (log.length && confirm("Delete all saved entries? Download the Excel file first if you need them.")) { log = []; saveLog(); renderLog(); }
+  });
+
+  $("xl").addEventListener("click", () => {
+    if (!log.length) { alert("Nothing to download yet. Click 'Save to log' first."); return; }
+    const q = t => '"' + String(t).replace(/"/g, '""') + '"';
+    const rows = [["Date", "Model", "Qty", "Filament (Rs)", "Electricity (Rs)", "Machine (Rs)", "Additional (Rs)", "Production cost (Rs)", "Profit (Rs)", "Selling price (Rs)"]];
+    log.forEach(e => rows.push([e.date, q(e.name), e.qty, e.filament, e.electricity, e.machine, e.extras, e.total, e.profit, e.sell]));
+    const n = log.length + 1; // last data row in the sheet
+    const col = c => "=SUM(" + c + "2:" + c + n + ")";
+    rows.push(["", "TOTAL", col("C"), col("D"), col("E"), col("F"), col("G"), col("H"), col("I"), col("J")]);
+    const csv = "\uFEFF" + rows.map(r => r.join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "3d-print-accounts.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  /* ---------- Repeat use ---------- */
+  function clearJob() {
+    ["name", "fgrams"].forEach(i => $(i).value = "");
+    ["hrs", "mins", "labour", "paint", "pack", "other"].forEach(i => $(i).value = "0");
+    $("qty").value = "1";
+    calc();
+    $("name").focus();
+  }
+  $("newCalc").addEventListener("click", clearJob);
+  $("saveNext").addEventListener("click", () => { $("save").click(); clearJob(); });
+
+  function parseCSV(t) {
+    const rows = []; let r = [], f = "", q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { r.push(f); f = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && t[i + 1] === "\n") i++; r.push(f); rows.push(r); r = []; f = ""; }
+      else f += c;
+    }
+    if (f !== "" || r.length) { r.push(f); rows.push(r); }
+    return rows;
+  }
+
+  $("impBtn").addEventListener("click", () => $("imp").click());
+  $("imp").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      let added = 0;
+      parseCSV(String(rd.result).replace(/^\uFEFF/, "")).slice(1).forEach(c => {
+        if (c.length < 10 || !c[0] || c[1] === "TOTAL") return;
+        const en = { date: c[0], name: c[1], qty: +c[2] || 1, filament: +c[3] || 0, electricity: +c[4] || 0, machine: +c[5] || 0, extras: +c[6] || 0, total: +c[7] || 0, profit: +c[8] || 0, sell: +c[9] || 0 };
+        if (!log.some(x => x.date === en.date && x.name === en.name && x.total === en.total && x.sell === en.sell)) { log.push(en); added++; }
+      });
+      saveLog(); renderLog();
+      alert(added + " entries imported.");
+    };
+    rd.readAsText(file);
+    e.target.value = "";
+  });
+
+  $("elenote").textContent = "Electricity is fixed: Bambu Lab A1 uses about " + PRINTER_KW.toFixed(2) + " unit per hour, at Rs " + RATE_PER_UNIT + " per unit.";
+  renderLog();
+  calc();
+</script>
+</body>
+</html>
